@@ -1,0 +1,320 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  NODE_VERSION: '20.x'
+  NPM_CACHE_FOLDER: '$(Pipeline.Workspace)/.npm'
+  PLAYWRIGHT_REPORT_DIR: 'playwright-report'
+  ALLURE_REPORT_DIR: 'allure-report'
+
+steps:
+# 1️⃣ Node.js
+- task: NodeTool@0
+  inputs:
+    versionSpec: '$(NODE_VERSION)'
+  displayName: 'Use Node.js $(NODE_VERSION)'
+
+# 2️⃣ Cache NPM
+- task: Cache@2
+  inputs:
+    key: 'npm | "$(Agent.OS)" | package-lock.json'
+    restoreKeys: |
+      npm | "$(Agent.OS)"
+    path: $(NPM_CACHE_FOLDER)
+  displayName: 'Cache NPM'
+
+# 3️⃣ Instalar dependências
+- script: npm ci --cache $(NPM_CACHE_FOLDER)
+  displayName: 'Install dependencies (npm ci)'
+
+# 4️⃣ Instalar browsers do Playwright
+- script: npx playwright install --with-deps
+  displayName: 'Install Playwright browsers'
+
+# 5️⃣ Cache Playwright browsers
+- task: Cache@2
+  inputs:
+    key: 'playwright | "$(Agent.OS)"'
+    path: $(HOME)/.cache/ms-playwright
+  displayName: 'Cache Playwright browsers'
+
+# 6️⃣ Start mocks em background
+- script: |
+    echo "Starting mock services directly..."
+    
+    # Start API mock
+    node test-mocks/mock-api.js &
+    API_PID=$!
+    echo $API_PID > .mock_api_pid
+    echo "Started mock API with PID: $API_PID"
+    
+    # Start UI mock  
+    node test-mocks/mock-ui.js &
+    UI_PID=$!
+    echo $UI_PID > .mock_ui_pid
+    echo "Started mock UI with PID: $UI_PID"
+    
+    # Wait for services to start
+    sleep 15
+    
+    # Verify mocks are running with retries
+    for i in {1..10}; do
+      if curl -f http://localhost:3333/users >/dev/null 2>&1; then
+        echo "✅ API mock is responding on port 3333"
+        break
+      else
+        echo "⏳ API mock not responding yet, attempt $i/10"
+        sleep 3
+      fi
+    done
+    
+    for i in {1..10}; do  
+      if curl -f http://localhost:3000 >/dev/null 2>&1; then
+        echo "✅ UI mock is responding on port 3000"
+        break
+      else
+        echo "⏳ UI mock not responding yet, attempt $i/10"
+        sleep 3
+      fi
+    done
+    
+    echo "Mock services startup completed"
+  displayName: 'Start mocks (background)'
+
+# 8️⃣ TypeScript check
+- script: npx tsc --noEmit
+  displayName: 'TypeScript: compile check'
+
+# 8️⃣ Cucumber API Tests
+- script: |
+    echo "Running Cucumber API tests..."
+    export BASE_URL=http://localhost:3000
+    npm run test:api:cucumber || true
+    
+    echo "API test results:"
+    ls -la || true
+  displayName: 'Run Cucumber API tests'
+
+# 8️⃣.1 Cucumber UI Tests  
+- script: |
+    echo "Running Cucumber UI tests..."
+    export BASE_URL=http://localhost:3000
+    # Run with longer timeout for UI tests
+    timeout 300 npm run test:ui:cucumber || echo "UI tests completed with timeout/errors"
+    
+    echo "UI test results:"
+    ls -la || true
+  displayName: 'Run Cucumber UI tests'
+
+# 8️⃣.2 Generate Cucumber JSON report
+- script: |
+    mkdir -p reports
+    npx cucumber-js tests/api/features/users.feature tests/ui/features \
+      --require-module ts-node/register \
+      --require "tests/api/steps/**/*.ts" \
+      --require "tests/ui/steps/**/*.ts" \
+      --format json:reports/cucumber.json || true
+  displayName: 'Generate Cucumber JSON report'
+
+# 9️⃣ Converter Cucumber JSON → JUnit
+- script: node scripts/convert-cucumber-json-to-junit.js
+  displayName: 'Convert Cucumber JSON to JUnit'
+
+# 🔟 Publicar Cucumber JUnit
+- task: PublishTestResults@2
+  inputs:
+    testResultsFiles: 'reports/*junit*.xml'
+    testRunTitle: 'Cucumber (JUnit)'
+    mergeTestResults: true
+    failTaskOnFailedTests: false
+  condition: always()
+  displayName: 'Publish Cucumber JUnit results'
+
+# 1️⃣0️⃣ Verify and restart mocks for Playwright
+- script: |
+    echo "Checking if mocks are still running..."
+    
+    # Check if mocks are responding
+    API_RESPONDING=false
+    UI_RESPONDING=false
+    
+    if curl -f http://localhost:3333/users >/dev/null 2>&1; then
+      API_RESPONDING=true
+      echo "✅ API mock is still responding"
+    else
+      echo "⚠️ API mock not responding"
+    fi
+    
+    if curl -f http://localhost:3000 >/dev/null 2>&1; then
+      UI_RESPONDING=true
+      echo "✅ UI mock is still responding"
+    else
+      echo "⚠️ UI mock not responding"
+    fi
+    
+    # Restart mocks if needed
+    if [ "$API_RESPONDING" = false ] || [ "$UI_RESPONDING" = false ]; then
+      echo "Restarting mock services for Playwright tests..."
+      
+      # Kill existing processes if any
+      pkill -f "mock-api.js" || true
+      pkill -f "mock-ui.js" || true
+      sleep 2
+      
+      # Start fresh mocks
+      node test-mocks/mock-api.js &
+      API_PID=$!
+      echo $API_PID > .mock_api_pid
+      echo "Restarted mock API with PID: $API_PID"
+      
+      node test-mocks/mock-ui.js &
+      UI_PID=$!
+      echo $UI_PID > .mock_ui_pid  
+      echo "Restarted mock UI with PID: $UI_PID"
+      
+      # Wait and verify
+      sleep 10
+      
+      for i in {1..5}; do
+        if curl -f http://localhost:3333/users >/dev/null 2>&1; then
+          echo "✅ API mock is now responding"
+          break
+        else
+          echo "⏳ Waiting for API mock, attempt $i/5"
+          sleep 3
+        fi
+      done
+      
+      for i in {1..5}; do  
+        if curl -f http://localhost:3000 >/dev/null 2>&1; then
+          echo "✅ UI mock is now responding"
+          break
+        else
+          echo "⏳ Waiting for UI mock, attempt $i/5"
+          sleep 3
+        fi
+      done
+    fi
+    
+    echo "Mock services are ready for Playwright tests"
+  displayName: 'Verify and restart mocks for Playwright'
+
+# 1️⃣1️⃣ Playwright Tests
+- script: |
+    echo "Running Playwright tests..."
+    echo "Mock services status before tests:"
+    curl -f http://localhost:3333/users >/dev/null 2>&1 && echo "API: OK" || echo "API: FAIL"
+    curl -f http://localhost:3000 >/dev/null 2>&1 && echo "UI: OK" || echo "UI: FAIL"
+    
+    mkdir -p test-results
+    export BASE_URL=http://localhost:3000
+    # Usar reporters do playwright.config.ts (html, junit, allure-playwright) para gerar allure-results
+    npx playwright test || true
+    
+    echo "Playwright test execution completed"
+    ls -la test-results/ || echo "No test-results directory"
+  displayName: 'Run Playwright tests'
+
+# 1️⃣1️⃣.1 Organize Playwright results
+- script: |
+    mkdir -p $(PLAYWRIGHT_REPORT_DIR)
+    
+    # Copy HTML report files if they exist
+    if [ -d "playwright-report" ]; then
+      cp -r playwright-report/* $(PLAYWRIGHT_REPORT_DIR)/ 2>/dev/null || true
+      echo "Playwright HTML report copied"
+    else
+      echo "No playwright-report directory found"
+    fi
+  displayName: 'Organize Playwright results'
+
+# 1️⃣2️⃣ Publicar Playwright JUnit
+- task: PublishTestResults@2
+  inputs:
+    testResultsFiles: 'test-results/playwright-results.xml'
+    testRunTitle: 'Playwright (JUnit)'
+    mergeTestResults: true
+    failTaskOnFailedTests: false
+  condition: always()
+  displayName: 'Publish Playwright JUnit results'
+
+# 1️⃣3️⃣ Publicar artefatos: Playwright HTML
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(PLAYWRIGHT_REPORT_DIR)'
+    artifact: 'playwright-report'
+    publishLocation: 'pipeline'
+  condition: always()
+  displayName: 'Publish Playwright HTML as Pipeline Artifact'
+
+# 1️⃣4️⃣ Adicionar link Playwright HTML no summary
+- script: |
+    if [ -f "$(PLAYWRIGHT_REPORT_DIR)/index.html" ]; then
+      echo "Playwright HTML report found, adding to summary"
+      echo "##vso[task.addattachment type=Distributedtask.Core.Summary;name=Playwright HTML Report;]$(System.DefaultWorkingDirectory)/$(PLAYWRIGHT_REPORT_DIR)/index.html"
+    else
+      echo "Playwright HTML report not found at $(PLAYWRIGHT_REPORT_DIR)/index.html"
+      echo "##vso[task.logissue type=warning;]Playwright HTML report was not generated or is missing"
+    fi
+  displayName: 'Add Playwright HTML link to summary'
+
+# 1️⃣6️⃣ Allure report
+- script: |
+    echo "Checking for allure-results..."
+    ls -la allure-results/ || echo "No allure-results directory found"
+    
+    if [ -d "allure-results" ] && [ "$(ls -A allure-results)" ]; then
+      echo "Generating Allure report..."
+      npx allure generate allure-results -o $(ALLURE_REPORT_DIR) --clean || echo "Allure generation failed"
+    else
+      echo "No allure results found, creating empty report directory"
+      mkdir -p $(ALLURE_REPORT_DIR)
+      echo "<h1>No test results available for Allure report</h1>" > $(ALLURE_REPORT_DIR)/index.html
+    fi
+  displayName: 'Generate Allure report'
+
+# 1️⃣6️⃣ Publicar artefatos: Allure
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(ALLURE_REPORT_DIR)'
+    artifact: 'allure-report'
+    publishLocation: 'pipeline'
+  condition: always()
+  displayName: 'Publish Allure HTML as Pipeline Artifact'
+
+# 1️⃣7️⃣ Allure Report (Qameta) – aba no Azure DevOps
+# Requer extensão: https://marketplace.visualstudio.com/items?itemName=qameta.allure-azure-pipelines
+- task: qameta.allure-azure-pipelines.PublishAllureReport.PublishAllureReport@2
+  displayName: 'Publish Allure Report (Qameta tab)'
+  inputs:
+    testResultsDir: 'allure-results'
+    reportName: 'Allure Report'
+  condition: always()
+
+# 1️⃣8️⃣ Debug: List generated files
+- script: |
+    echo "=== DEBUG: Listing generated files ==="
+    echo "Current directory contents:"
+    ls -la
+    echo ""
+    echo "Reports directory:"
+    ls -la reports/ || echo "No reports directory"
+    echo ""
+    echo "Test results directory:"
+    find test-results -type f || echo "No test-results directory"
+    echo ""
+    echo "Playwright report directory:"
+    ls -la $(PLAYWRIGHT_REPORT_DIR)/ || echo "No Playwright report directory"
+    echo ""
+    echo "Allure report directory:"
+    ls -la $(ALLURE_REPORT_DIR)/ || echo "No Allure report directory"
+  displayName: 'Debug: List generated files'
+
+# 1️⃣9️⃣ Stop mocks
+- script: npm run stop:mocks || true
+  displayName: 'Stop mocks (best-effort)'

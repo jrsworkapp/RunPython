@@ -1,0 +1,77 @@
+{
+  "uid": "minhaapi-security",
+  "title": "MinhaAPI - Segurança (Auth & Abuse)",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["security", "auth", "loki", "sre"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "401 - Falhas de Autenticação",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode = 401 [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "403 - Acesso Negado",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode = 403 [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Falhas Auth por Minuto",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 4 },
+      "targets": [
+        {
+          "expr": "count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode = 401 or statusCode = 403 [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top UserId com Falha de Login",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "topk(10, count by (userId) (count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode = 401 [5m])))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Endpoints Mais Atacados",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "topk(10, count by (endpoint) (count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode = 401 or statusCode = 403 [5m])))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Eventos Suspeitos",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{app=\"MinhaAPI\", env=\"prod\"} | json | statusCode = 401 or statusCode = 403",
+          "datasource": "Loki"
+        }
+      ]
+    }
+  ]
+}

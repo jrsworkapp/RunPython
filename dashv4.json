@@ -1,0 +1,115 @@
+{
+  "uid": "ipanema-loki-dev",
+  "title": "📊 Ipanema API – Observabilidade (DEV)",
+  "tags": ["loki", "nlog", "ipanema", "security", "sre"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "datasource": {
+    "type": "loki",
+    "uid": "loki"
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "🚀 Requests / segundo",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | __error__=\"\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "⏱️ Latência Média (ms)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "avg({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "🔥 Erros (4xx + 5xx)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode >= 400 [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "📈 Latência p95 / p99",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.95, {app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs [5m])",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "quantile_over_time(0.99, {app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs [5m])",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "🚦 Status HTTP",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode >= 200 and statusCode < 300 [1m]))",
+          "legendFormat": "2xx"
+        },
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode >= 400 and statusCode < 500 [1m]))",
+          "legendFormat": "4xx"
+        },
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode >= 500 [1m]))",
+          "legendFormat": "5xx"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "🧭 Top Endpoints (Latência)",
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "topk(10, avg by (endpoint) ({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "💥 Erros por Endpoint",
+      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode >= 400 [5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "🧨 Logs com Exceção",
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{app=\"IpanemaAPI-v2\", env=\"dev\"} | json | exceptions.exception.message != \"\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

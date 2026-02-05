@@ -1,0 +1,149 @@
+{
+  "uid": "minhaapi-loki-observability",
+  "title": "MinhaAPI - Observabilidade (Loki / NLog)",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["loki", "nlog", "observability", "sre"],
+  "templating": {
+    "list": [
+      {
+        "name": "endpoint",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({app=\"MinhaAPI\"}, endpoint)",
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "statusCode",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({app=\"MinhaAPI\"}, statusCode)",
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "level",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({app=\"MinhaAPI\"}, level)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total de Requests / min",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Erros (4xx + 5xx)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode >= 400 [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Latência Média (ms)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "avg_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | unwrap durationMs [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "P95 Latência (ms)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.95, {app=\"MinhaAPI\", env=\"prod\"} | json | unwrap durationMs [5m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests por minuto",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json [1m])",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latência Média por Endpoint",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "avg by (endpoint) (avg_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | unwrap durationMs [5m]))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Erros por StatusCode",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "count by (statusCode) (count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode >= 400 [5m]))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Endpoints com Erro",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "topk(10, count by (endpoint) (count_over_time({app=\"MinhaAPI\", env=\"prod\"} | json | statusCode >= 400 [5m])))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Requests Lentos (> 1s)",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "{app=\"MinhaAPI\", env=\"prod\"} | json | durationMs > 1000 | line_format \"{{.time}} {{.method}} {{.endpoint}} {{.durationMs}}ms\"\"",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Logs Detalhados",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{app=\"MinhaAPI\", env=\"prod\"} | json",
+          "datasource": "Loki"
+        }
+      ]
+    }
+  ]
+}

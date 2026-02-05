@@ -1,0 +1,86 @@
+{
+  "uid": "minhaapi-kubernetes",
+  "title": "MinhaAPI - Kubernetes Observability",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["kubernetes", "loki", "sre"],
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({app=\"MinhaAPI\"}, namespace)",
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({app=\"MinhaAPI\", namespace=\"$namespace\"}, pod)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Requests por Pod",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "count by (pod) (count_over_time({app=\"MinhaAPI\", namespace=\"$namespace\"} | json [1m]))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latência Média por Pod (ms)",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 6 },
+      "targets": [
+        {
+          "expr": "avg by (pod) (avg_over_time({app=\"MinhaAPI\", namespace=\"$namespace\"} | json | unwrap durationMs [5m]))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "Erros 5xx por Namespace",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "count by (namespace) (count_over_time({app=\"MinhaAPI\"} | json | statusCode >= 500 [5m]))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Pods Mais Lentos (Top 5)",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "topk(5, avg by (pod) (avg_over_time({app=\"MinhaAPI\"} | json | unwrap durationMs [5m])))",
+          "datasource": "Loki"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Logs por Pod",
+      "gridPos": { "x": 0, "y": 18, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{app=\"MinhaAPI\", namespace=\"$namespace\", pod=\"$pod\"} | json",
+          "datasource": "Loki"
+        }
+      ]
+    }
+  ]
+}

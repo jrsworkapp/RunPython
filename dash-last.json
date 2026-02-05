@@ -1,0 +1,111 @@
+{
+  "uid": "ipanema-api-text-safe",
+  "title": "📊 Ipanema API – Logs (DEV | Text-based)",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["loki", "logs", "ipanema", "dev"],
+  "datasource": {
+    "type": "loki",
+    "uid": "loki"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "🚀 Requests / segundo",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"env\\\": \\\"dev\\\"\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "🔥 Requests com erro (4xx)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"statusCode\\\": \\\"4\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "💥 Erros 5xx",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"statusCode\\\": \\\"5\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "📈 Tráfego por Método HTTP",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"method\\\": \\\"GET\\\"\" [1m]))",
+          "legendFormat": "GET"
+        },
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"method\\\": \\\"POST\\\"\" [1m]))",
+          "legendFormat": "POST"
+        },
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"method\\\": \\\"PUT\\\"\" [1m]))",
+          "legendFormat": "PUT"
+        },
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"\\\"method\\\": \\\"DELETE\\\"\" [1m]))",
+          "legendFormat": "DELETE"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "🧭 Tráfego por Endpoint (aproximação)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate({} |= \"IpanemaAPI-V2\" |= \"/api/v1/debts\" [1m]))",
+          "legendFormat": "/api/v1/debts/*"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "📄 Requests Concluídas",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{} |= \"IpanemaAPI-V2\" |= \"Request concluída\"",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "🧨 Logs de Erro / Exception",
+      "gridPos": { "x": 0, "y": 18, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{} |= \"IpanemaAPI-V2\" |= \"exception\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

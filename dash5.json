@@ -1,0 +1,66 @@
+{
+  "uid": "ipanema-api-loki-dev",
+  "title": "📊 Ipanema API – Observabilidade (DEV)",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["loki", "nlog", "ipanema", "dev"],
+  "datasource": {
+    "type": "loki",
+    "uid": "loki"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "🚀 Requests / segundo",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"}[1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "⏱️ Latência média (ms)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "avg_over_time({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs [5m])",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "🔥 Erros (4xx + 5xx)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode =~ \"4..|5..\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "📈 Latência p95 / p99",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.95, {app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs [5m])",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "quantile_over_time(0.99, {app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs [5m])",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {

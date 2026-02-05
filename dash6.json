@@ -1,0 +1,95 @@
+{
+  "uid": "ipanema-api-loki-safe",
+  "title": "📊 Ipanema API – Logs & Tráfego (DEV)",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["loki", "logs", "ipanema", "dev"],
+  "datasource": {
+    "type": "loki",
+    "uid": "loki"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "🚀 Requests / segundo",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"}[1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "🔥 Requests com erro",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} |= \"\\\"statusCode\\\":4\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "💥 Erros 5xx",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} |= \"\\\"statusCode\\\":5\" [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "📈 Tráfego por Endpoint",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint)(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json [1m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "🚦 Status HTTP (volume)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} |= \"\\\"statusCode\\\":2\" [1m]))",
+          "legendFormat": "2xx"
+        },
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} |= \"\\\"statusCode\\\":4\" [1m]))",
+          "legendFormat": "4xx"
+        },
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} |= \"\\\"statusCode\\\":5\" [1m]))",
+          "legendFormat": "5xx"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "🧨 Logs com Exceção",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{app=\"IpanemaAPI-v2\", env=\"dev\"} |= \"exception\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

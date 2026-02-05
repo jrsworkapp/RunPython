@@ -64,3 +64,60 @@
       ]
     },
     {
+      "id": 5,
+      "type": "timeseries",
+      "title": "🚦 Status HTTP (RPS)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode =~ \"2..\" [1m]))",
+          "legendFormat": "2xx"
+        },
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode =~ \"4..\" [1m]))",
+          "legendFormat": "4xx"
+        },
+        {
+          "expr": "sum(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode =~ \"5..\" [1m]))",
+          "legendFormat": "5xx"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "🧭 Top 10 Endpoints – Latência Média",
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "topk(10, avg_over_time({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | unwrap durationMs [5m])) by (endpoint)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "💥 Erros por Endpoint",
+      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (endpoint)(rate({app=\"IpanemaAPI-v2\", env=\"dev\"} | json | statusCode =~ \"4..|5..\" [5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "🧨 Logs com Exceção",
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "expr": "{app=\"IpanemaAPI-v2\", env=\"dev\"} | json | exceptions.exception.message != \"\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
